@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: go-service-monitor
+  namespace: demo
+  labels:
+    team: devops
+spec:
+  endpoints:
+  - port: web  
+    interval: 15s
+  namespaceSelector:
+    matchNames:
+    - demo
+  selector:
+    matchLabels:
+      app: go-app 

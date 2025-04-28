@@ -1,0 +1,22 @@
+.control-panel {
+    margin: 20px;
+  }
+  
+  .control-panel button {
+    padding: 10px 20px;
+    font-size: 16px;
+  }
+  
+  .control-panel table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  
+  .control-panel th,
+  .control-panel td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+  }
+  

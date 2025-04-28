@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package proto;
+option go_package = "./";
+
+service Node {
+  rpc GetNodeForRequest (NodeRequest) returns (NodeResponse);
+  rpc AddNodeForRequest (NodeRequest) returns (AddNodeResponse);
+  rpc RemoveNodeForRequest (NodeRequest) returns (DeleteNodeResponse);
+}
+
+message NodeRequest {
+  string key = 1;
+  string node = 2;
+  string ip = 3;
+}
+
+message NodeResponse {
+  string node = 1;
+  int32 hash = 2;
+}
+
+message AddNodeResponse {
+  int32 hash = 1;
+}
+
+message DeleteNodeResponse {
+  int32 hash = 1;
+}
+
+message Empty {}
