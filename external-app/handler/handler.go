@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"hashing/client"
-	ph "hashing/hashing"
+	pb "hashing/hashing"
 	"hashing/hashring"
+	websocketserver "hashing/websocket-server"
 	"log"
 	"net"
 	"net/http"
 	"os/exec"
-	"time"
 )
 
 const (
@@ -33,7 +33,7 @@ func getIP(r *http.Request) (string, error) {
 	}
 
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	fmt.Println("ipppp", ip)
+
 	if err != nil {
 		return "", err
 	} else {
@@ -52,63 +52,83 @@ func runCurlFromCurlPod(podIP string) error {
 	return nil
 }
 
-func AddFirstServer(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+// func AddFirstServer(w http.ResponseWriter, r *http.Request) {
+// 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+// 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+// 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
-	cmd := exec.Command("kubectl", "apply", "-f", "../kubernetes/deployment.yaml")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to apply manifest: %s", output), http.StatusInternalServerError)
-		return
-	}
-	hashring := hashring.GetRingInstance()
+// 	cmd := exec.Command("kubectl", "apply", "-f", "../kubernetes/deployment.yaml")
+// 	output, err := cmd.CombinedOutput()
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("Failed to apply manifest: %s", output), http.StatusInternalServerError)
+// 		return
+// 	}
+// 	hashring := hashring.GetRingInstance()
 
-	timeout := time.After(30 * time.Second)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+// 	timeout := time.After(30 * time.Second)
+// 	ticker := time.NewTicker(1 * time.Second)
+// 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-timeout:
-			http.Error(w, "Timeout waiting for node to be added to the hash ring", http.StatusGatewayTimeout)
-			return
-		case <-ticker.C:
-			if hashring.GetLenNodes() == 1 {
-				hashring.RLock()
-				hashValue := hashring.Nodes[0]
-				hashring.RUnlock()
+// 	for {
+// 		select {
+// 		case <-timeout:
+// 			http.Error(w, "Timeout waiting for node to be added to the hash ring", http.StatusGatewayTimeout)
+// 			return
+// 		case <-ticker.C:
+// 			if hashring.GetLenNodes() == 1 {
+// 				hashring.RLock()
+// 				hashValue := hashring.NodeMetaData[0]
+// 				hashring.RUnlock()
 
-				// Respond with the hash value in JSON format
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]int{"hash": hashValue})
-				return
-			}
-		}
-	}
-}
+// 				// Respond with the hash value in JSON format
+// 				w.Header().Set("Content-Type", "application/json")
+// 				json.NewEncoder(w).Encode(map[string]int{"hash": hashValue})
+// 				return
+// 			}
+// 		}
+// 	}
+// }
 
 func GetServer(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	if clientIP, err := getIP(r); err == nil {
-		c := client.GetClient()
-		response, err := c.GetNodeForRequest(context.Background(), &ph.NodeRequest{Key: clientIP})
-		if err != nil {
-			log.Fatalf("Error getting node IP for clientIP %s: %v", clientIP, err)
-		}
 
-		err = runCurlFromCurlPod(response.Node)
+		hashring.GetRingInstance().GetNode(clientIP)
+		websocketserver.Broadcast(&pb.WebSocketMetadata{
+			Type: "client",
+			Data: &pb.WebSocketMetadata_RequestMetaData{
+				RequestMetaData: &pb.RequestMetaData{
+					AssignedNodeName: hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeName,
+					AssignedNodeIp:   hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP,
+					RequestHash:      hashring.GetRingInstance().RequestIpToMetaData[clientIP].RequestHash,
+					AssignedNodeHash: hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeHash,
+				},
+			},
+		})
+
+		err = runCurlFromCurlPod(hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP)
 		if err != nil {
 			log.Printf("Error running curl from curl-pod: %v", err)
 		} else {
-			log.Printf("Successfully ran curl to %s", response.Node)
+			log.Printf("Successfully ran curl to %s", hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]int{"hash": int(response.Hash)})
+		json.NewEncoder(w).Encode(map[string]int{"hash": int(hashring.GetRingInstance().RequestIpToMetaData[clientIP].RequestHash)})
 	} else {
 
 	}
+}
+
+func Get(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	c := client.GetClient()
+	list, _ := c.GetHashRingData(context.Background(), &pb.Empty{})
+	fmt.Println(list, "list")
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[int]string{1: "hello"})
 }

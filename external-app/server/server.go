@@ -2,38 +2,51 @@ package server
 
 import (
 	"context"
-	"fmt"
-	ph "hashing/hashing"
+	pb "hashing/hashing"
 	"hashing/hashring"
 	"log"
-	"net"
+	"net/http"
 
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
 )
 
 type NodeService struct {
 	HashRing *hashring.HashRing
-	ph.UnimplementedNodeServer
+	pb.UnimplementedNodeServer
 }
 
-// GetNodeForRequest returns the node responsible for the given gRPC request
-func (ns *NodeService) GetNodeForRequest(ctx context.Context, req *ph.NodeRequest) (*ph.NodeResponse, error) {
-	fmt.Println("hellooooo")
-	node, hash := ns.HashRing.GetNode(req.Key)
-	fmt.Println(node, "node")
-	return &ph.NodeResponse{Node: node, Hash: int32(hash)}, nil
-}
+func (ns *NodeService) GetHashRingData(ctx context.Context, req *pb.Empty) (*pb.WebSocketMetadataList, error) {
+	WebSocketMetadataList := &pb.WebSocketMetadataList{}
+	for _, node_meta_data := range hashring.GetRingInstance().NodeNameToNodeMetaData {
+		WebSocketMetadataList.Item = append(WebSocketMetadataList.Item, &pb.WebSocketMetadata{
+			Type:   "pod",
+			Action: "add",
+			Data: &pb.WebSocketMetadata_NodeMetaData{
+				NodeMetaData: &pb.NodeMetaData{
+					NodeHash: node_meta_data.NodeHash,
+					NodeIp:   node_meta_data.NodeIP,
+					NodeName: node_meta_data.NodeName,
+				},
+			},
+		})
+	}
 
-// AddNodeForRequest adds a new node for the given gRPC request
-func (ns *NodeService) AddNodeForRequest(ctx context.Context, req *ph.NodeRequest) (*ph.AddNodeResponse, error) {
-	hashValue := ns.HashRing.AddNode(req.Node, req.Ip)
-	return &ph.AddNodeResponse{Hash: int32(hashValue)}, nil
-}
+	for _, request_meta_data := range hashring.GetRingInstance().RequestIpToMetaData {
+		WebSocketMetadataList.Item = append(WebSocketMetadataList.Item, &pb.WebSocketMetadata{
+			Type: "client",
+			Data: &pb.WebSocketMetadata_RequestMetaData{
+				RequestMetaData: &pb.RequestMetaData{
+					AssignedNodeName: request_meta_data.AssignedNodeName,
+					AssignedNodeIp:   request_meta_data.AssignedNodeIP,
+					RequestHash:      request_meta_data.RequestHash,
+					AssignedNodeHash: request_meta_data.AssignedNodeHash,
+				},
+			},
+		})
+	}
 
-// RemoveNodeForRequest removes a node for the given gRPC request
-func (ns *NodeService) RemoveNodeForRequest(ctx context.Context, req *ph.NodeRequest) (*ph.DeleteNodeResponse, error) {
-	ns.HashRing.RemoveNode(req.Node)
-	return &ph.DeleteNodeResponse{}, nil
+	return WebSocketMetadataList, nil
 }
 
 func StartGrpcServer() {
@@ -42,16 +55,27 @@ func StartGrpcServer() {
 
 	server := grpc.NewServer()
 	nodeService := &NodeService{HashRing: hashRing}
-	ph.RegisterNodeServer(server, nodeService)
+	pb.RegisterNodeServer(server, nodeService)
 
-	listener, err := net.Listen("tcp", ":50051")
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+	// Wrap gRPC server with grpc-web
+	wrappedGrpc := grpcweb.WrapServer(server,
+		grpcweb.WithOriginFunc(func(origin string) bool { return true }), // Allow all origins
+	)
+
+	// Create HTTP handler for grpc-web
+	httpServer := http.Server{
+		Addr: ":8080",
+		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			if wrappedGrpc.IsGrpcWebRequest(req) || wrappedGrpc.IsAcceptableGrpcCorsRequest(req) {
+				wrappedGrpc.ServeHTTP(resp, req)
+			} else {
+				resp.WriteHeader(http.StatusNotFound)
+			}
+		}),
 	}
-	defer listener.Close()
 
-	log.Println("Server listening on :50051")
-	if err := server.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+	log.Println("gRPC-Web Server listening on :8080")
+	if err := httpServer.ListenAndServe(); err != nil {
+		log.Fatalf("Failed to serve HTTP: %v", err)
 	}
 }

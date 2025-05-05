@@ -21,29 +21,33 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type NodeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Node          string                 `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
-	Ip            string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
+type WebSocketMetadata struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Type   string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Action string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
+	// Types that are valid to be assigned to Data:
+	//
+	//	*WebSocketMetadata_NodeMetaData
+	//	*WebSocketMetadata_RequestMetaData
+	Data          isWebSocketMetadata_Data `protobuf_oneof:"data"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *NodeRequest) Reset() {
-	*x = NodeRequest{}
+func (x *WebSocketMetadata) Reset() {
+	*x = WebSocketMetadata{}
 	mi := &file_hashing_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *NodeRequest) String() string {
+func (x *WebSocketMetadata) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*NodeRequest) ProtoMessage() {}
+func (*WebSocketMetadata) ProtoMessage() {}
 
-func (x *NodeRequest) ProtoReflect() protoreflect.Message {
+func (x *WebSocketMetadata) ProtoReflect() protoreflect.Message {
 	mi := &file_hashing_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -55,54 +59,89 @@ func (x *NodeRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use NodeRequest.ProtoReflect.Descriptor instead.
-func (*NodeRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use WebSocketMetadata.ProtoReflect.Descriptor instead.
+func (*WebSocketMetadata) Descriptor() ([]byte, []int) {
 	return file_hashing_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *NodeRequest) GetKey() string {
+func (x *WebSocketMetadata) GetType() string {
 	if x != nil {
-		return x.Key
+		return x.Type
 	}
 	return ""
 }
 
-func (x *NodeRequest) GetNode() string {
+func (x *WebSocketMetadata) GetAction() string {
 	if x != nil {
-		return x.Node
+		return x.Action
 	}
 	return ""
 }
 
-func (x *NodeRequest) GetIp() string {
+func (x *WebSocketMetadata) GetData() isWebSocketMetadata_Data {
 	if x != nil {
-		return x.Ip
+		return x.Data
 	}
-	return ""
+	return nil
 }
 
-type NodeResponse struct {
+func (x *WebSocketMetadata) GetNodeMetaData() *NodeMetaData {
+	if x != nil {
+		if x, ok := x.Data.(*WebSocketMetadata_NodeMetaData); ok {
+			return x.NodeMetaData
+		}
+	}
+	return nil
+}
+
+func (x *WebSocketMetadata) GetRequestMetaData() *RequestMetaData {
+	if x != nil {
+		if x, ok := x.Data.(*WebSocketMetadata_RequestMetaData); ok {
+			return x.RequestMetaData
+		}
+	}
+	return nil
+}
+
+type isWebSocketMetadata_Data interface {
+	isWebSocketMetadata_Data()
+}
+
+type WebSocketMetadata_NodeMetaData struct {
+	NodeMetaData *NodeMetaData `protobuf:"bytes,3,opt,name=node_meta_data,json=nodeMetaData,proto3,oneof"`
+}
+
+type WebSocketMetadata_RequestMetaData struct {
+	RequestMetaData *RequestMetaData `protobuf:"bytes,4,opt,name=request_meta_data,json=requestMetaData,proto3,oneof"`
+}
+
+func (*WebSocketMetadata_NodeMetaData) isWebSocketMetadata_Data() {}
+
+func (*WebSocketMetadata_RequestMetaData) isWebSocketMetadata_Data() {}
+
+type NodeMetaData struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Node          string                 `protobuf:"bytes,1,opt,name=node,proto3" json:"node,omitempty"`
-	Hash          int32                  `protobuf:"varint,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	NodeName      string                 `protobuf:"bytes,1,opt,name=node_name,json=nodeName,proto3" json:"node_name,omitempty"`
+	NodeIp        string                 `protobuf:"bytes,2,opt,name=node_ip,json=nodeIp,proto3" json:"node_ip,omitempty"`
+	NodeHash      int32                  `protobuf:"varint,3,opt,name=node_hash,json=nodeHash,proto3" json:"node_hash,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *NodeResponse) Reset() {
-	*x = NodeResponse{}
+func (x *NodeMetaData) Reset() {
+	*x = NodeMetaData{}
 	mi := &file_hashing_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *NodeResponse) String() string {
+func (x *NodeMetaData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*NodeResponse) ProtoMessage() {}
+func (*NodeMetaData) ProtoMessage() {}
 
-func (x *NodeResponse) ProtoReflect() protoreflect.Message {
+func (x *NodeMetaData) ProtoReflect() protoreflect.Message {
 	mi := &file_hashing_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -114,46 +153,56 @@ func (x *NodeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use NodeResponse.ProtoReflect.Descriptor instead.
-func (*NodeResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use NodeMetaData.ProtoReflect.Descriptor instead.
+func (*NodeMetaData) Descriptor() ([]byte, []int) {
 	return file_hashing_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *NodeResponse) GetNode() string {
+func (x *NodeMetaData) GetNodeName() string {
 	if x != nil {
-		return x.Node
+		return x.NodeName
 	}
 	return ""
 }
 
-func (x *NodeResponse) GetHash() int32 {
+func (x *NodeMetaData) GetNodeIp() string {
 	if x != nil {
-		return x.Hash
+		return x.NodeIp
+	}
+	return ""
+}
+
+func (x *NodeMetaData) GetNodeHash() int32 {
+	if x != nil {
+		return x.NodeHash
 	}
 	return 0
 }
 
-type AddNodeResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Hash          int32                  `protobuf:"varint,1,opt,name=hash,proto3" json:"hash,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+type RequestMetaData struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AssignedNodeName string                 `protobuf:"bytes,1,opt,name=assigned_node_name,json=assignedNodeName,proto3" json:"assigned_node_name,omitempty"`
+	AssignedNodeIp   string                 `protobuf:"bytes,2,opt,name=assigned_node_ip,json=assignedNodeIp,proto3" json:"assigned_node_ip,omitempty"`
+	RequestHash      int32                  `protobuf:"varint,3,opt,name=request_hash,json=requestHash,proto3" json:"request_hash,omitempty"`
+	AssignedNodeHash int32                  `protobuf:"varint,4,opt,name=assigned_node_hash,json=assignedNodeHash,proto3" json:"assigned_node_hash,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
-func (x *AddNodeResponse) Reset() {
-	*x = AddNodeResponse{}
+func (x *RequestMetaData) Reset() {
+	*x = RequestMetaData{}
 	mi := &file_hashing_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AddNodeResponse) String() string {
+func (x *RequestMetaData) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AddNodeResponse) ProtoMessage() {}
+func (*RequestMetaData) ProtoMessage() {}
 
-func (x *AddNodeResponse) ProtoReflect() protoreflect.Message {
+func (x *RequestMetaData) ProtoReflect() protoreflect.Message {
 	mi := &file_hashing_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -165,39 +214,60 @@ func (x *AddNodeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AddNodeResponse.ProtoReflect.Descriptor instead.
-func (*AddNodeResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use RequestMetaData.ProtoReflect.Descriptor instead.
+func (*RequestMetaData) Descriptor() ([]byte, []int) {
 	return file_hashing_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *AddNodeResponse) GetHash() int32 {
+func (x *RequestMetaData) GetAssignedNodeName() string {
 	if x != nil {
-		return x.Hash
+		return x.AssignedNodeName
+	}
+	return ""
+}
+
+func (x *RequestMetaData) GetAssignedNodeIp() string {
+	if x != nil {
+		return x.AssignedNodeIp
+	}
+	return ""
+}
+
+func (x *RequestMetaData) GetRequestHash() int32 {
+	if x != nil {
+		return x.RequestHash
 	}
 	return 0
 }
 
-type DeleteNodeResponse struct {
+func (x *RequestMetaData) GetAssignedNodeHash() int32 {
+	if x != nil {
+		return x.AssignedNodeHash
+	}
+	return 0
+}
+
+type WebSocketMetadataList struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Hash          int32                  `protobuf:"varint,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Item          []*WebSocketMetadata   `protobuf:"bytes,1,rep,name=item,proto3" json:"item,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DeleteNodeResponse) Reset() {
-	*x = DeleteNodeResponse{}
+func (x *WebSocketMetadataList) Reset() {
+	*x = WebSocketMetadataList{}
 	mi := &file_hashing_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DeleteNodeResponse) String() string {
+func (x *WebSocketMetadataList) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DeleteNodeResponse) ProtoMessage() {}
+func (*WebSocketMetadataList) ProtoMessage() {}
 
-func (x *DeleteNodeResponse) ProtoReflect() protoreflect.Message {
+func (x *WebSocketMetadataList) ProtoReflect() protoreflect.Message {
 	mi := &file_hashing_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -209,16 +279,16 @@ func (x *DeleteNodeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DeleteNodeResponse.ProtoReflect.Descriptor instead.
-func (*DeleteNodeResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use WebSocketMetadataList.ProtoReflect.Descriptor instead.
+func (*WebSocketMetadataList) Descriptor() ([]byte, []int) {
 	return file_hashing_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DeleteNodeResponse) GetHash() int32 {
+func (x *WebSocketMetadataList) GetItem() []*WebSocketMetadata {
 	if x != nil {
-		return x.Hash
+		return x.Item
 	}
-	return 0
+	return nil
 }
 
 type Empty struct {
@@ -261,23 +331,27 @@ var File_hashing_proto protoreflect.FileDescriptor
 
 const file_hashing_proto_rawDesc = "" +
 	"\n" +
-	"\rhashing.proto\x12\x05proto\"C\n" +
-	"\vNodeRequest\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
-	"\x04node\x18\x02 \x01(\tR\x04node\x12\x0e\n" +
-	"\x02ip\x18\x03 \x01(\tR\x02ip\"6\n" +
-	"\fNodeResponse\x12\x12\n" +
-	"\x04node\x18\x01 \x01(\tR\x04node\x12\x12\n" +
-	"\x04hash\x18\x02 \x01(\x05R\x04hash\"%\n" +
-	"\x0fAddNodeResponse\x12\x12\n" +
-	"\x04hash\x18\x01 \x01(\x05R\x04hash\"(\n" +
-	"\x12DeleteNodeResponse\x12\x12\n" +
-	"\x04hash\x18\x01 \x01(\x05R\x04hash\"\a\n" +
-	"\x05Empty2\xcc\x01\n" +
-	"\x04Node\x12<\n" +
-	"\x11GetNodeForRequest\x12\x12.proto.NodeRequest\x1a\x13.proto.NodeResponse\x12?\n" +
-	"\x11AddNodeForRequest\x12\x12.proto.NodeRequest\x1a\x16.proto.AddNodeResponse\x12E\n" +
-	"\x14RemoveNodeForRequest\x12\x12.proto.NodeRequest\x1a\x19.proto.DeleteNodeResponseB\x04Z\x02./b\x06proto3"
+	"\rhashing.proto\x12\x05proto\"\xca\x01\n" +
+	"\x11WebSocketMetadata\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12;\n" +
+	"\x0enode_meta_data\x18\x03 \x01(\v2\x13.proto.NodeMetaDataH\x00R\fnodeMetaData\x12D\n" +
+	"\x11request_meta_data\x18\x04 \x01(\v2\x16.proto.RequestMetaDataH\x00R\x0frequestMetaDataB\x06\n" +
+	"\x04data\"a\n" +
+	"\fNodeMetaData\x12\x1b\n" +
+	"\tnode_name\x18\x01 \x01(\tR\bnodeName\x12\x17\n" +
+	"\anode_ip\x18\x02 \x01(\tR\x06nodeIp\x12\x1b\n" +
+	"\tnode_hash\x18\x03 \x01(\x05R\bnodeHash\"\xba\x01\n" +
+	"\x0fRequestMetaData\x12,\n" +
+	"\x12assigned_node_name\x18\x01 \x01(\tR\x10assignedNodeName\x12(\n" +
+	"\x10assigned_node_ip\x18\x02 \x01(\tR\x0eassignedNodeIp\x12!\n" +
+	"\frequest_hash\x18\x03 \x01(\x05R\vrequestHash\x12,\n" +
+	"\x12assigned_node_hash\x18\x04 \x01(\x05R\x10assignedNodeHash\"E\n" +
+	"\x15WebSocketMetadataList\x12,\n" +
+	"\x04item\x18\x01 \x03(\v2\x18.proto.WebSocketMetadataR\x04item\"\a\n" +
+	"\x05Empty2E\n" +
+	"\x04Node\x12=\n" +
+	"\x0fGetHashRingData\x12\f.proto.Empty\x1a\x1c.proto.WebSocketMetadataListB\x04Z\x02./b\x06proto3"
 
 var (
 	file_hashing_proto_rawDescOnce sync.Once
@@ -293,30 +367,33 @@ func file_hashing_proto_rawDescGZIP() []byte {
 
 var file_hashing_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_hashing_proto_goTypes = []any{
-	(*NodeRequest)(nil),        // 0: proto.NodeRequest
-	(*NodeResponse)(nil),       // 1: proto.NodeResponse
-	(*AddNodeResponse)(nil),    // 2: proto.AddNodeResponse
-	(*DeleteNodeResponse)(nil), // 3: proto.DeleteNodeResponse
-	(*Empty)(nil),              // 4: proto.Empty
+	(*WebSocketMetadata)(nil),     // 0: proto.WebSocketMetadata
+	(*NodeMetaData)(nil),          // 1: proto.NodeMetaData
+	(*RequestMetaData)(nil),       // 2: proto.RequestMetaData
+	(*WebSocketMetadataList)(nil), // 3: proto.WebSocketMetadataList
+	(*Empty)(nil),                 // 4: proto.Empty
 }
 var file_hashing_proto_depIdxs = []int32{
-	0, // 0: proto.Node.GetNodeForRequest:input_type -> proto.NodeRequest
-	0, // 1: proto.Node.AddNodeForRequest:input_type -> proto.NodeRequest
-	0, // 2: proto.Node.RemoveNodeForRequest:input_type -> proto.NodeRequest
-	1, // 3: proto.Node.GetNodeForRequest:output_type -> proto.NodeResponse
-	2, // 4: proto.Node.AddNodeForRequest:output_type -> proto.AddNodeResponse
-	3, // 5: proto.Node.RemoveNodeForRequest:output_type -> proto.DeleteNodeResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: proto.WebSocketMetadata.node_meta_data:type_name -> proto.NodeMetaData
+	2, // 1: proto.WebSocketMetadata.request_meta_data:type_name -> proto.RequestMetaData
+	0, // 2: proto.WebSocketMetadataList.item:type_name -> proto.WebSocketMetadata
+	4, // 3: proto.Node.GetHashRingData:input_type -> proto.Empty
+	3, // 4: proto.Node.GetHashRingData:output_type -> proto.WebSocketMetadataList
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_hashing_proto_init() }
 func file_hashing_proto_init() {
 	if File_hashing_proto != nil {
 		return
+	}
+	file_hashing_proto_msgTypes[0].OneofWrappers = []any{
+		(*WebSocketMetadata_NodeMetaData)(nil),
+		(*WebSocketMetadata_RequestMetaData)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

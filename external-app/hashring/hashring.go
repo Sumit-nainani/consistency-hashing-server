@@ -16,121 +16,95 @@ var (
 	instance *HashRing
 )
 
+type RequestMetaData struct {
+	RequestHash      int32
+	AssignedNodeHash int32
+	AssignedNodeIP   string
+	AssignedNodeName string
+}
+
+type NodeMetaData struct {
+	NodeHash int32
+	NodeIP   string
+	NodeName string
+}
+
 type HashRing struct {
 	sync.RWMutex
-	Nodes     []int
-	IpHash    map[string]int
-	KeyToIP   map[int]string
-	KeyToNode map[string]string
-	NodeToIP  map[string]string
+	NodeMetaData           []NodeMetaData
+	NodeNameToNodeMetaData map[string]NodeMetaData
+	RequestIpToMetaData    map[string]RequestMetaData
 }
 
 func GetRingInstance() *HashRing {
 	once.Do(func() {
 		instance = &HashRing{
-			IpHash:    make(map[string]int),
-			KeyToIP:   make(map[int]string),
-			KeyToNode: make(map[string]string),
-			NodeToIP:  make(map[string]string),
+			NodeNameToNodeMetaData: make(map[string]NodeMetaData),
+			RequestIpToMetaData:    make(map[string]RequestMetaData),
 		}
 	})
 	return instance
 }
 
-func (hr *HashRing) GetLenNodes() int {
-	hr.RLock()
-	defer hr.RUnlock()
-	return len(hr.Nodes)
-}
-
-func getHashValue(key uint32) int {
-	return int(key % RING_SIZE)
-}
-
-// Finding the best server for serving all requests whose key values is less than or qual to server's key value
-// Using Binary search algorithm
-func getNodeIp(ringNode []int, keyToIP map[int]string, hashValue int) string {
+func (hr *HashRing) getNodeIp(RequestIPHashValue int32) NodeMetaData {
 	l := 0
-	h := len(ringNode) - 1
+	h := len(hr.NodeMetaData) - 1
 
 	for l < h {
 		m := (l + h) / 2
-		if ringNode[m] >= hashValue {
+		if hr.NodeMetaData[m].NodeHash >= RequestIPHashValue {
 			h = m
 		} else {
 			l = m + 1
 		}
 	}
-	if ringNode[l] >= hashValue {
-		return keyToIP[ringNode[l]]
-	} else if ringNode[h] >= hashValue {
-		return keyToIP[ringNode[h]]
+	if hr.NodeMetaData[l].NodeHash >= RequestIPHashValue {
+		return hr.NodeMetaData[l]
+	} else if hr.NodeMetaData[h].NodeHash >= RequestIPHashValue {
+		return hr.NodeMetaData[h]
 	} else {
-		return keyToIP[ringNode[0]]
+		return hr.NodeMetaData[0]
 	}
 }
 
-func (hr *HashRing) AddNode(node string, ip string) int {
+func (hr *HashRing) AddNode(nodeName string, nodeIp string) {
 	hr.Lock()
 	defer hr.Unlock()
 
-	key := crc32.ChecksumIEEE([]byte(ip))
-	hashValue := getHashValue(key)
+	nodeHashValue := int32(crc32.ChecksumIEEE([]byte(nodeIp)) % RING_SIZE)
 
-	if _, ok := hr.IpHash[ip]; ok {
-		return hashValue
-	}
-
-	hr.IpHash[ip] = 1
-	hr.NodeToIP[node] = ip
-	hr.KeyToIP[hashValue] = ip
-
-	insertPos := sort.Search(len(hr.Nodes), func(i int) bool {
-		return hr.Nodes[i] >= hashValue
+	insertPos := sort.Search(len(hr.NodeMetaData), func(i int) bool {
+		return hr.NodeMetaData[i].NodeHash >= nodeHashValue
 	})
 
-	// Insert the element at the found position
-	hr.Nodes = append(hr.Nodes[:insertPos], append([]int{hashValue}, hr.Nodes[insertPos:]...)...)
-	fmt.Println(hr.Nodes, hr.IpHash, hr.KeyToIP, hr.NodeToIP)
-	return hashValue
+	hr.NodeNameToNodeMetaData[nodeName] = NodeMetaData{NodeHash: nodeHashValue, NodeName: nodeName, NodeIP: nodeIp}
+	hr.NodeMetaData = append(hr.NodeMetaData[:insertPos], append([]NodeMetaData{{
+		NodeHash: nodeHashValue,
+		NodeIP:   nodeIp,
+		NodeName: nodeName,
+	}}, hr.NodeMetaData[insertPos:]...)...)
+	fmt.Println(hr.NodeMetaData, hr.NodeNameToNodeMetaData)
 }
 
-func (hr *HashRing) RemoveNode(node string) int {
+func (hr *HashRing) RemoveNode(nodeName string) {
 	hr.Lock()
 	defer hr.Unlock()
-	key := crc32.ChecksumIEEE([]byte(hr.NodeToIP[node]))
-	hashValue := getHashValue(key)
 
-	if _, ok := hr.NodeToIP[node]; !ok {
-		return hashValue
-	}
-
-	delete(hr.KeyToIP, hashValue)
-	delete(hr.IpHash, hr.NodeToIP[node])
-	delete(hr.NodeToIP, node)
-
-	for i := len(hr.Nodes) - 1; i >= 0; i-- {
-		if hr.Nodes[i] == hashValue {
-			hr.Nodes = append(hr.Nodes[:i], hr.Nodes[i+1:]...)
+	for i := len(hr.NodeMetaData) - 1; i >= 0; i-- {
+		if hr.NodeMetaData[i].NodeName == nodeName {
+			name := hr.NodeMetaData[i].NodeName
+			hr.NodeMetaData = append(hr.NodeMetaData[:i], hr.NodeMetaData[i+1:]...)
+			delete(hr.NodeNameToNodeMetaData, name)
 		}
 	}
-	fmt.Println("deleting the pod")
-	fmt.Println(hr.Nodes, hr.IpHash, hr.KeyToIP, hr.NodeToIP)
-	return hashValue
 }
 
-// GetNode returns the node responsible for the given key
-func (hr *HashRing) GetNode(key string) (string, int){
+func (hr *HashRing) GetNode(requestIP string) {
 	hr.RLock()
 	defer hr.RUnlock()
 
-	// if node, ok := hr.KeyToNode[key]; ok {
-	// 	fmt.Println("already exist , ", node)
-	// 	return node
-	// }
+	RequestIPHashValue := int32(crc32.ChecksumIEEE([]byte(requestIP)) % RING_SIZE)
+	AssignedNodeMetaData := hr.getNodeIp(RequestIPHashValue)
 
-	hash := crc32.ChecksumIEEE([]byte(key))
-	hashValue := getHashValue(hash)
-
-	return getNodeIp(hr.Nodes, hr.KeyToIP, hashValue),hashValue
+	hr.RequestIpToMetaData[requestIP] = RequestMetaData{RequestHash: RequestIPHashValue, AssignedNodeHash: AssignedNodeMetaData.NodeHash, AssignedNodeName: AssignedNodeMetaData.NodeName, AssignedNodeIP: AssignedNodeMetaData.NodeIP}
 }

@@ -6,6 +6,7 @@ import (
 	"hashing/kubeclient"
 	"hashing/metrics"
 	"hashing/server"
+	websocketserver "hashing/websocket-server"
 
 	// ph "hashing/hashing"
 	// "fmt"
@@ -31,6 +32,15 @@ func main() {
 	metrics.Init()
 	go server.StartGrpcServer()
 	go kubeclient.StartKubeClient()
+	go websocketserver.GetHub().Run()
 	var router *mux.Router = router.Router()
-	log.Fatal(http.ListenAndServe(":8085", router))
+
+	router.HandleFunc("/ws", websocketserver.HandleWS)
+	go func() {
+		log.Println("WebSocket server started on :8085")
+		if err := http.ListenAndServe(":8085", router); err != nil {
+			log.Fatalf("WebSocket server error: %v", err)
+		}
+	}()
+	select {}
 }

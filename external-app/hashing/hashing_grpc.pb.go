@@ -19,18 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Node_GetNodeForRequest_FullMethodName    = "/proto.Node/GetNodeForRequest"
-	Node_AddNodeForRequest_FullMethodName    = "/proto.Node/AddNodeForRequest"
-	Node_RemoveNodeForRequest_FullMethodName = "/proto.Node/RemoveNodeForRequest"
+	Node_GetHashRingData_FullMethodName = "/proto.Node/GetHashRingData"
 )
 
 // NodeClient is the client API for Node service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NodeClient interface {
-	GetNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*NodeResponse, error)
-	AddNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*AddNodeResponse, error)
-	RemoveNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*DeleteNodeResponse, error)
+	GetHashRingData(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*WebSocketMetadataList, error)
 }
 
 type nodeClient struct {
@@ -41,30 +37,10 @@ func NewNodeClient(cc grpc.ClientConnInterface) NodeClient {
 	return &nodeClient{cc}
 }
 
-func (c *nodeClient) GetNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*NodeResponse, error) {
+func (c *nodeClient) GetHashRingData(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*WebSocketMetadataList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(NodeResponse)
-	err := c.cc.Invoke(ctx, Node_GetNodeForRequest_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *nodeClient) AddNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*AddNodeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AddNodeResponse)
-	err := c.cc.Invoke(ctx, Node_AddNodeForRequest_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *nodeClient) RemoveNodeForRequest(ctx context.Context, in *NodeRequest, opts ...grpc.CallOption) (*DeleteNodeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(DeleteNodeResponse)
-	err := c.cc.Invoke(ctx, Node_RemoveNodeForRequest_FullMethodName, in, out, cOpts...)
+	out := new(WebSocketMetadataList)
+	err := c.cc.Invoke(ctx, Node_GetHashRingData_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +51,7 @@ func (c *nodeClient) RemoveNodeForRequest(ctx context.Context, in *NodeRequest, 
 // All implementations must embed UnimplementedNodeServer
 // for forward compatibility.
 type NodeServer interface {
-	GetNodeForRequest(context.Context, *NodeRequest) (*NodeResponse, error)
-	AddNodeForRequest(context.Context, *NodeRequest) (*AddNodeResponse, error)
-	RemoveNodeForRequest(context.Context, *NodeRequest) (*DeleteNodeResponse, error)
+	GetHashRingData(context.Context, *Empty) (*WebSocketMetadataList, error)
 	mustEmbedUnimplementedNodeServer()
 }
 
@@ -88,14 +62,8 @@ type NodeServer interface {
 // pointer dereference when methods are called.
 type UnimplementedNodeServer struct{}
 
-func (UnimplementedNodeServer) GetNodeForRequest(context.Context, *NodeRequest) (*NodeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetNodeForRequest not implemented")
-}
-func (UnimplementedNodeServer) AddNodeForRequest(context.Context, *NodeRequest) (*AddNodeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddNodeForRequest not implemented")
-}
-func (UnimplementedNodeServer) RemoveNodeForRequest(context.Context, *NodeRequest) (*DeleteNodeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveNodeForRequest not implemented")
+func (UnimplementedNodeServer) GetHashRingData(context.Context, *Empty) (*WebSocketMetadataList, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetHashRingData not implemented")
 }
 func (UnimplementedNodeServer) mustEmbedUnimplementedNodeServer() {}
 func (UnimplementedNodeServer) testEmbeddedByValue()              {}
@@ -118,56 +86,20 @@ func RegisterNodeServer(s grpc.ServiceRegistrar, srv NodeServer) {
 	s.RegisterService(&Node_ServiceDesc, srv)
 }
 
-func _Node_GetNodeForRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeRequest)
+func _Node_GetHashRingData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(NodeServer).GetNodeForRequest(ctx, in)
+		return srv.(NodeServer).GetHashRingData(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Node_GetNodeForRequest_FullMethodName,
+		FullMethod: Node_GetHashRingData_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).GetNodeForRequest(ctx, req.(*NodeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Node_AddNodeForRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(NodeServer).AddNodeForRequest(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Node_AddNodeForRequest_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).AddNodeForRequest(ctx, req.(*NodeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Node_RemoveNodeForRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NodeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(NodeServer).RemoveNodeForRequest(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Node_RemoveNodeForRequest_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NodeServer).RemoveNodeForRequest(ctx, req.(*NodeRequest))
+		return srv.(NodeServer).GetHashRingData(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -180,16 +112,8 @@ var Node_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*NodeServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GetNodeForRequest",
-			Handler:    _Node_GetNodeForRequest_Handler,
-		},
-		{
-			MethodName: "AddNodeForRequest",
-			Handler:    _Node_AddNodeForRequest_Handler,
-		},
-		{
-			MethodName: "RemoveNodeForRequest",
-			Handler:    _Node_RemoveNodeForRequest_Handler,
+			MethodName: "GetHashRingData",
+			Handler:    _Node_GetHashRingData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -10,7 +10,7 @@ import (
 func Router() *mux.Router {
 	r := mux.NewRouter()
 	r.HandleFunc("/", handler.GetServer)
-	r.HandleFunc("/init", handler.AddFirstServer)
+	r.HandleFunc("/get", handler.Get)
 	r.Path("/metrics").Handler(promhttp.Handler())
 
 	return r

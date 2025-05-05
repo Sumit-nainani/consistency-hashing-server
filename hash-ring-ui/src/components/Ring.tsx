@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState ,useRef,useEffect} from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
+import * as proto from '../proto/hashing_pb';
 
 const TOTAL_POSITIONS = 64; 
 const CIRCLE_RADIUS = 300;
@@ -9,6 +10,73 @@ const Ring = () => {
   const [servers, setServers] = useState([]);
   const [keys, setKeys] = useState([]);
   const [disableAddServer, setDisableAddServer] = useState(false);
+  // const [metadataList, setMetadataList] = useState<proto.proto.WebSocketMetadataObject[]>([]);
+
+  const ws = useRef<WebSocket | null>(null);
+  // useEffect(() => {
+  //   client.getHashRingData(new proto.Empty(), {}, (err, response) => {
+  //     if (err) {
+  //       console.error('gRPC Error:', err);
+  //       return;
+  //     }
+  //     console.log('Raw gRPC Response:', response);
+  //     // const list = response.getItemsList().map(item => item.toObject());
+  //     // setMetadataList(list);
+  //   });
+  // }, []);
+
+  // useEffect(() => {
+    
+
+  //   client.getHashRingData(request, {}, (err, response) => {
+  //     if (err) {
+  //       console.error('gRPC error:', err.message);
+  //       return;
+  //     }
+
+  //     console.log('Raw gRPC Response:', response);
+
+  //   // Log as plain JS object
+  //   const items = response.getItemList().map(item => item.toObject());
+  //   console.log('Parsed Items:', items);
+
+  //   // setMetadataList(items);
+  //   });
+  // }, []);
+
+  useEffect(() => {
+    // Initialize WebSocket connection
+    ws.current = new WebSocket('ws://localhost:8085/ws');
+
+    ws.current.onopen = () => {
+      console.log('WebSocket connection opened');
+    };
+
+    ws.current.onmessage = (e) => {
+      const reader = new FileReader();
+
+      reader.onload = () => {
+        const bytes = new Uint8Array(e.data);
+        const msg = proto.WebSocketMetadata.deserializeBinary(bytes);
+        const object = msg.toObject();
+        console.log(object);
+      };
+
+      // setMessages((prev) => [...prev, data]);
+    };
+
+    ws.current.onerror = (e) => {
+      console.error('WebSocket error:', e);
+    };
+
+    ws.current.onclose = (e) => {
+      console.log('WebSocket closed:', e.code, e.reason);
+    };
+
+    return () => {
+      ws.current?.close(); // Clean up on unmount
+    };
+  }, []); 
 
   const getCoordinates = (index) => {
     const angle = (2 * Math.PI * index) / TOTAL_POSITIONS;
@@ -16,11 +84,11 @@ const Ring = () => {
     const y = CIRCLE_RADIUS * Math.sin(angle);
     return { x, y };
   };
-
+   
   const addServer = async () => {
     setDisableAddServer(true);
     try {
-      const res = await axios.get("http://localhost:8085/init");
+      const res = await axios.get("http://localhost:8085/get");
       const position = res.data.hash;
       setServers([...servers, { id: servers.length, position }]);
     } catch (err) {

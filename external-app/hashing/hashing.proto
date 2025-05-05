@@ -4,28 +4,33 @@ package proto;
 option go_package = "./";
 
 service Node {
-  rpc GetNodeForRequest (NodeRequest) returns (NodeResponse);
-  rpc AddNodeForRequest (NodeRequest) returns (AddNodeResponse);
-  rpc RemoveNodeForRequest (NodeRequest) returns (DeleteNodeResponse);
+  rpc GetHashRingData (Empty) returns (WebSocketMetadataList);
 }
 
-message NodeRequest {
-  string key = 1;
-  string node = 2;
-  string ip = 3;
+message WebSocketMetadata{
+  string type = 1;
+  string action = 2;
+  oneof data{
+    NodeMetaData node_meta_data = 3;
+    RequestMetaData request_meta_data = 4;
+  }
 }
 
-message NodeResponse {
-  string node = 1;
-  int32 hash = 2;
+message NodeMetaData{
+  string node_name = 1;
+  string node_ip = 2;
+  int32 node_hash = 3;
 }
 
-message AddNodeResponse {
-  int32 hash = 1;
+message RequestMetaData{
+  string assigned_node_name = 1;
+  string assigned_node_ip = 2;
+  int32 request_hash = 3;
+  int32 assigned_node_hash = 4;
 }
 
-message DeleteNodeResponse {
-  int32 hash = 1;
+message WebSocketMetadataList{
+  repeated WebSocketMetadata item = 1;
 }
 
 message Empty {}

@@ -3,9 +3,11 @@ package kubeclient
 import (
 	"context"
 	"fmt"
-	"hashing/client"
-	ph "hashing/hashing"
+	"hashing/hashring"
+	websocketserver "hashing/websocket-server"
 	"log"
+
+	pb "hashing/hashing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,16 +15,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
-
-func handleAddPod(podName string, podIp string) {
-	c := client.GetClient()
-	c.AddNodeForRequest(context.Background(), &ph.NodeRequest{Node: podName, Ip: podIp})
-}
-
-func handleRemovePod(podName string) {
-	c := client.GetClient()
-	c.RemoveNodeForRequest(context.Background(), &ph.NodeRequest{Node: podName})
-}
 
 func StartKubeClient() {
 	// Load kubeconfig (from ~/.kube/config or in-cluster config if deployed inside k8s)
@@ -67,20 +59,39 @@ func StartKubeClient() {
 		switch event.Type {
 		case watch.Added:
 			fmt.Printf("🔴 Pod Added: %s/%s\n", pod.Namespace, pod.Name)
+
 		case watch.Deleted:
 			fmt.Printf("🔴 Pod deleted: %s/%s\n", pod.Namespace, pod.Name)
-			handleRemovePod(pod.Name)
+			websocketserver.Broadcast(&pb.WebSocketMetadata{
+				Type:   "pod",
+				Action: "remove",
+				Data: &pb.WebSocketMetadata_NodeMetaData{
+					NodeMetaData: &pb.NodeMetaData{
+						NodeIp:   hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeIP,
+						NodeName: pod.Name,
+						NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
+					},
+				},
+			})
+			hashring.GetRingInstance().RemoveNode(pod.Name)
+
 		case watch.Modified:
 			fmt.Printf("✏️ Pod modified: %s/%s %s \n", pod.Namespace, pod.Name, pod.Status.PodIP)
-			var ch chan string = make(chan string)
+
 			if pod.Status.Phase == corev1.PodRunning {
 				go func() {
-					for x := range ch {
-						handleAddPod(pod.Name, x)
-					}
-				}()
-				go func() {
-					ch <- pod.Status.PodIP
+					hashring.GetRingInstance().AddNode(pod.Name, pod.Status.PodIP)
+					websocketserver.Broadcast(&pb.WebSocketMetadata{
+						Type:   "pod",
+						Action: "add",
+						Data: &pb.WebSocketMetadata_NodeMetaData{
+							NodeMetaData: &pb.NodeMetaData{
+								NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
+								NodeIp:   pod.Status.PodIP,
+								NodeName: pod.Name,
+							},
+						},
+					})
 				}()
 			}
 		default:
