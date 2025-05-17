@@ -5,9 +5,8 @@ import (
 	pb "hashing/hashing"
 	"hashing/hashring"
 	"log"
-	"net/http"
+	"net"
 
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
 )
 
@@ -52,30 +51,37 @@ func (ns *NodeService) GetHashRingData(ctx context.Context, req *pb.Empty) (*pb.
 func StartGrpcServer() {
 
 	hashRing := hashring.GetRingInstance()
-
-	server := grpc.NewServer()
-	nodeService := &NodeService{HashRing: hashRing}
-	pb.RegisterNodeServer(server, nodeService)
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	grpcServer := grpc.NewServer()
+	pb.RegisterNodeServer(grpcServer, &NodeService{HashRing: hashRing})
+	log.Println("gRPC server on :50051")
+	grpcServer.Serve(lis)
+	// server := grpc.NewServer()
+	// nodeService := &NodeService{HashRing: hashRing}
+	// pb.RegisterNodeServer(server, nodeService)
 
 	// Wrap gRPC server with grpc-web
-	wrappedGrpc := grpcweb.WrapServer(server,
-		grpcweb.WithOriginFunc(func(origin string) bool { return true }), // Allow all origins
-	)
+	// wrappedGrpc := grpcweb.WrapServer(server,
+	// 	grpcweb.WithOriginFunc(func(origin string) bool { return true }), // Allow all origins
+	// )
 
 	// Create HTTP handler for grpc-web
-	httpServer := http.Server{
-		Addr: ":8080",
-		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			if wrappedGrpc.IsGrpcWebRequest(req) || wrappedGrpc.IsAcceptableGrpcCorsRequest(req) {
-				wrappedGrpc.ServeHTTP(resp, req)
-			} else {
-				resp.WriteHeader(http.StatusNotFound)
-			}
-		}),
-	}
+	// httpServer := http.Server{
+	// 	Addr: ":8080",
+	// 	Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	// 		if wrappedGrpc.IsGrpcWebRequest(req) || wrappedGrpc.IsAcceptableGrpcCorsRequest(req) {
+	// 			wrappedGrpc.ServeHTTP(resp, req)
+	// 		} else {
+	// 			resp.WriteHeader(http.StatusNotFound)
+	// 		}
+	// 	}),
+	// }
 
-	log.Println("gRPC-Web Server listening on :8080")
-	if err := httpServer.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to serve HTTP: %v", err)
-	}
+	// log.Println("gRPC-Web Server listening on :8080")
+	// if err := httpServer.ListenAndServe(); err != nil {
+	// 	log.Fatalf("Failed to serve HTTP: %v", err)
+	// }
 }

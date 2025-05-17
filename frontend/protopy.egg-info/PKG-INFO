@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: protopy
+Version: 0.1
+Requires-Dist: grpcio==1.71.0
+Requires-Dist: grpcio-tools==1.71.0
+Dynamic: requires-dist

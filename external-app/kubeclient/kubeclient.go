@@ -6,6 +6,7 @@ import (
 	"hashing/hashring"
 	websocketserver "hashing/websocket-server"
 	"log"
+	"time"
 
 	pb "hashing/hashing"
 
@@ -17,7 +18,6 @@ import (
 )
 
 func StartKubeClient() {
-	// Load kubeconfig (from ~/.kube/config or in-cluster config if deployed inside k8s)
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		clientcmd.NewDefaultClientConfigLoadingRules(),
 		&clientcmd.ConfigOverrides{},
@@ -27,75 +27,94 @@ func StartKubeClient() {
 		log.Fatalf("Failed to load kubeconfig: %v", err)
 	}
 
-	// Create Kubernetes clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatalf("Failed to create clientset: %v", err)
 	}
 
-	podList, err := clientset.CoreV1().Pods("default").List(context.TODO(), metav1.ListOptions{})
+	var resourceVersion string
 
-	if err != nil {
-		log.Fatalf("Error listing pods: %v", err)
-	}
+	for {
+		// Get latest pod list and resourceVersion
+		podList, err := clientset.CoreV1().Pods("demo").List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			log.Printf("Error listing pods: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		resourceVersion = podList.ResourceVersion
 
-	// Step 2: Start watching from that ResourceVersion
-	watcher, err := clientset.CoreV1().Pods("demo").Watch(context.TODO(), metav1.ListOptions{
-		ResourceVersion: podList.ResourceVersion,
-	})
-
-	if err != nil {
-		log.Fatalf("Failed to watch pods: %v", err)
-	}
-	fmt.Println("🔁 Watching for pod events...")
-
-	for event := range watcher.ResultChan() {
-		pod, ok := event.Object.(*corev1.Pod)
-		if !ok {
-			log.Println("Unexpected type")
+		watcher, err := clientset.CoreV1().Pods("demo").Watch(context.TODO(), metav1.ListOptions{
+			ResourceVersion: resourceVersion,
+		})
+		if err != nil {
+			log.Printf("Failed to start watcher: %v", err)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		switch event.Type {
-		case watch.Added:
-			fmt.Printf("🔴 Pod Added: %s/%s\n", pod.Namespace, pod.Name)
+		fmt.Println("🔁 Watching for pod events...")
 
-		case watch.Deleted:
-			fmt.Printf("🔴 Pod deleted: %s/%s\n", pod.Namespace, pod.Name)
-			websocketserver.Broadcast(&pb.WebSocketMetadata{
-				Type:   "pod",
-				Action: "remove",
-				Data: &pb.WebSocketMetadata_NodeMetaData{
-					NodeMetaData: &pb.NodeMetaData{
-						NodeIp:   hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeIP,
-						NodeName: pod.Name,
-						NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
-					},
-				},
-			})
-			hashring.GetRingInstance().RemoveNode(pod.Name)
+	watchLoop:
+		for event := range watcher.ResultChan() {
+			switch obj := event.Object.(type) {
+			case *corev1.Pod:
+				pod := obj
+				resourceVersion = pod.ResourceVersion
 
-		case watch.Modified:
-			fmt.Printf("✏️ Pod modified: %s/%s %s \n", pod.Namespace, pod.Name, pod.Status.PodIP)
+				switch event.Type {
+				case watch.Added:
+					fmt.Printf("🟢 Pod Added: %s/%s\n", pod.Namespace, pod.Name)
 
-			if pod.Status.Phase == corev1.PodRunning {
-				go func() {
-					hashring.GetRingInstance().AddNode(pod.Name, pod.Status.PodIP)
-					websocketserver.Broadcast(&pb.WebSocketMetadata{
-						Type:   "pod",
-						Action: "add",
-						Data: &pb.WebSocketMetadata_NodeMetaData{
-							NodeMetaData: &pb.NodeMetaData{
-								NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
-								NodeIp:   pod.Status.PodIP,
-								NodeName: pod.Name,
+				case watch.Deleted:
+					fmt.Printf("🔴 Pod Deleted: %s/%s\n", pod.Namespace, pod.Name)
+					if nodeMeta, exists := hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name]; exists {
+						websocketserver.Broadcast(&pb.WebSocketMetadata{
+							Type:   "pod",
+							Action: "remove",
+							Data: &pb.WebSocketMetadata_NodeMetaData{
+								NodeMetaData: &pb.NodeMetaData{
+									NodeIp:   nodeMeta.NodeIP,
+									NodeName: pod.Name,
+									NodeHash: nodeMeta.NodeHash,
+								},
 							},
-						},
-					})
-				}()
+						})
+					}
+					hashring.GetRingInstance().RemoveNode(pod.Name)
+
+				case watch.Modified:
+					fmt.Printf("✏️ Pod Modified: %s/%s %s\n", pod.Namespace, pod.Name, pod.Status.PodIP)
+					if pod.Status.Phase == corev1.PodRunning {
+
+						hashring.GetRingInstance().AddNode(pod.Name, pod.Status.PodIP)
+						websocketserver.Broadcast(&pb.WebSocketMetadata{
+							Type:   "pod",
+							Action: "add",
+							Data: &pb.WebSocketMetadata_NodeMetaData{
+								NodeMetaData: &pb.NodeMetaData{
+									NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
+									NodeIp:   pod.Status.PodIP,
+									NodeName: pod.Name,
+								},
+							},
+						})
+
+					}
+				default:
+					fmt.Println("Unknown pod event type")
+				}
+
+			case *metav1.Status:
+				log.Printf("📴 Watch closed with status: %s", obj.Message)
+				break watchLoop // exit the for loop cleanly
+
+			default:
+				log.Printf("❓ Unknown event object type: %T\n", event.Object)
 			}
-		default:
-			fmt.Println("Unknown event type")
 		}
+
+		log.Println("🔁 Restarting watcher...")
+		time.Sleep(2 * time.Second)
 	}
 }

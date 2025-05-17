@@ -2,6 +2,7 @@ package main
 
 import (
 	// "context"
+
 	"hashing/client"
 	"hashing/kubeclient"
 	"hashing/metrics"
@@ -35,7 +36,6 @@ func main() {
 	go websocketserver.GetHub().Run()
 	var router *mux.Router = router.Router()
 
-	router.HandleFunc("/ws", websocketserver.HandleWS)
 	go func() {
 		log.Println("WebSocket server started on :8085")
 		if err := http.ListenAndServe(":8085", router); err != nil {
