@@ -1,0 +1,5 @@
+tornado
+websockets
+python-dotenv
+grpcio 
+grpcio-tools

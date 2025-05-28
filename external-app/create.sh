@@ -56,5 +56,8 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 # Check if metrics-server is installed successfully
 echo "✅ Metrics server installed successfully."
 
+kubectl run curl --image=curlimages/curl --namespace=curl-pod --restart=Never -- sleep 3600
+echo "✅ Curl pod created in 'curl' namespace."
+
 # Final confirmation
 echo "✅ Cluster '$CLUSTER_NAME' setup complete with namespaces, Prometheus, and Metrics Server."

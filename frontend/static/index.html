@@ -1,57 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Consistent Hashing Ring</title>
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: row;
-        margin: 0;
-        padding: 0;
-      }
 
-      #left-panel {
-        flex: 1;
-        padding: 20px;
-      }
+<head>
+  <meta charset="UTF-8" />
+  <title>Consistent Hashing Ring</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="/static/style.css" />
+</head>
 
-      #right-panel {
-        width: 500px;
-        padding: 20px;
-        overflow-y: auto;
-      }
-
-      table {
-        border-collapse: collapse;
-        width: 100%;
-        margin-bottom: 20px;
-      }
-
-      th,
-      td {
-        border: 1px solid #ccc;
-        padding: 8px;
-        text-align: center;
-      }
-
-      th {
-        background-color: #f4f4f4;
-      }
-
-      h3 {
-        margin-top: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="left-panel">
-      <div id="ring"></div>
+<body>
+  <div id="left-panel">
+    <h1>Consistent Hashing</h1>
+    <div class="rebalancing" id="rebalancing-message">
+      Rebalancing ring...
     </div>
-
-    <div id="right-panel">
+    <div>
       <h3>Client Assignments</h3>
       <table id="client-table">
         <thead>
@@ -64,7 +27,9 @@
         </thead>
         <tbody></tbody>
       </table>
+    </div>
 
+    <div>
       <h3>Pod Nodes</h3>
       <table id="pod-table">
         <thead>
@@ -77,181 +42,15 @@
         <tbody></tbody>
       </table>
     </div>
+  </div>
 
-    <!-- Hidden image elements to load local icons -->
-    <img id="docker-icon" src="/static/docker.png" style="display: none" />
-    <img id="client-icon" src="/static/client.png" style="display: none" />
+  <div id="right-panel">
+    <div id="ring"></div>
+  </div>
 
-    <script>
-      const ringSize = 64;
-      const radius = 1.4;
-      const angles = Array.from(
-        { length: ringSize },
-        (_, i) => (2 * Math.PI * i) / ringSize
-      );
+  <img id="docker-icon" src="/static/docker.png" style="display: none" />
+  <img id="client-icon" src="/static/client.png" style="display: none" />
 
-      function drawRing(pods = [], clients = []) {
-        const layout = {
-          xaxis: { visible: false },
-          yaxis: { visible: false, scaleanchor: "x", scaleratio: 1 },
-          width: 700,
-          height: 700,
-          margin: { l: 10, r: 10, t: 10, b: 10 },
-          plot_bgcolor: "white",
-          images: [],
-        };
-
-        const ring = {
-          x: angles.map((a) => radius * Math.cos(a)),
-          y: angles.map((a) => radius * Math.sin(a)),
-          mode: "lines",
-          line: { color: "red" },
-          type: "scatter",
-          showlegend: false,
-        };
-
-        // Add ring labels 0 to 63
-        const labels = {
-          x: angles.map((a) => radius * Math.cos(a)),
-          y: angles.map((a) => radius * Math.sin(a)),
-          mode: "text",
-          type: "scatter",
-          text: Array.from({ length: ringSize }, (_, i) => String(i)),
-          textposition: "middle center",
-          textfont: { size: 10, color: "black" },
-          showlegend: false,
-          hoverinfo: "none",
-        };
-
-        // Load base64 images
-        const dockerIconSrc = document.getElementById("docker-icon").src;
-        const clientIconSrc = document.getElementById("client-icon").src;
-
-        // Add pod icons
-        for (let pos of pods) {
-          let angle = angles[pos % ringSize];
-          let x = radius * Math.cos(angle);
-          let y = radius * Math.sin(angle);
-          layout.images.push({
-            source: dockerIconSrc,
-            xref: "x",
-            yref: "y",
-            x: x,
-            y: y,
-            sizex: 0.15,
-            sizey: 0.15,
-            xanchor: "center",
-            yanchor: "middle",
-            layer: "above",
-          });
-        }
-
-        // Add client icons
-        for (let pos of clients) {
-          let angle = angles[pos % ringSize];
-          let x = radius * Math.cos(angle);
-          let y = radius * Math.sin(angle);
-          layout.images.push({
-            source: clientIconSrc,
-            xref: "x",
-            yref: "y",
-            x: x,
-            y: y,
-            sizex: 0.12,
-            sizey: 0.12,
-            xanchor: "center",
-            yanchor: "middle",
-            layer: "above",
-          });
-        }
-
-        Plotly.newPlot("ring", [ring, labels], layout);
-      }
-
-      function updateTables(podInfoList, clientInfoList) {
-        const podTable = document.querySelector("#pod-table tbody");
-        const clientTable = document.querySelector("#client-table tbody");
-
-        // Clear existing rows
-        podTable.innerHTML = "";
-        clientTable.innerHTML = "";
-
-        // Insert pod rows
-        podInfoList.forEach((pod) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-          <td>${pod.nodeMetaData.nodeName}</td>
-          <td>${pod.nodeMetaData.nodeIp}</td>
-          <td>${pod.nodeMetaData.nodeHash}</td>
-        `;
-          podTable.appendChild(row);
-        });
-
-        // Insert client rows
-        clientInfoList.forEach((client) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-          <td>${client.requestMetaData.requestHash}</td>
-          <td>${client.requestMetaData.assignedNodeName}</td>
-          <td>${client.requestMetaData.assignedNodeIp}</td>
-          <td>${client.requestMetaData.assignedNodeHash}</td>
-        `;
-          clientTable.appendChild(row);
-        });
-      }
-      let pods = [];
-      let clients = [];
-      let podItems = [];
-      let clientItems = [];
-      // WebSocket connection
-      const socket = new WebSocket("ws://localhost:8888/ws-client");
-      socket.onmessage = function (event) {
-        try {
-          const raw = JSON.parse(event.data);
-
-          // Handle both array and single object
-          let items = [];
-
-          if (Array.isArray(raw.item)) {
-            // gRPC case: { item: [...] }
-            items = raw.item;
-          } else if (Array.isArray(raw)) {
-            // Unexpected case (rare), raw is itself an array
-            items = raw;
-          } else if (raw.type && (raw.nodeMetaData || raw.requestMetaData)) {
-            // WebSocket case: single object
-            items = [raw];
-          } else {
-            console.warn("Unknown message format:", raw);
-          }
-          console.log(items, "items");
-          items.forEach((item) => {
-            if (item.type === "pod") {
-              const hash = item.nodeMetaData?.nodeHash || 64;
-              if (item.action === "add") {
-                if (!pods.includes(hash)) {
-                  pods.push(hash);
-                  podItems.push(item);
-                }
-              } else if (item.action === "remove") {
-                const index = pods.indexOf(hash);
-                if (index !== -1) {
-                  pods.splice(index, 1);
-                  podItems.splice(index, 1);
-                }
-              }
-            } else if (item.type === "client") {
-              clients.push(item.requestMetaData.requestHash);
-              clientItems.push(item);
-            }
-          });
-          console.log(pods, clients, "array");
-          drawRing(pods, clients); // Update the ring UI
-          updateTables(podItems, clientItems);
-        } catch (err) {
-          console.error("WebSocket message handling failed:", err);
-        }
-      };
-    </script>
-  </body>
+  <script src="/static/index.js"></script>
+</body>
 </html>

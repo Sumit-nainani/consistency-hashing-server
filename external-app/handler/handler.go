@@ -3,89 +3,59 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	pb "hashing/hashing"
 	"hashing/hashring"
-	websocketserver "hashing/websocket-server"
-	"log"
-	"net"
+	"hashing/utility"
 	"net/http"
-	"os/exec"
 	"time"
 )
 
-const (
-	containerPort string = "8080"
-)
-
-func getIP(r *http.Request) (string, error) {
-
-	forwarded := r.Header.Get("X-Forwarded-For")
-
-	if forwarded != "" {
-		return forwarded, nil
-	}
-
-	realIP := r.Header.Get("X-Real-IP")
-
-	if realIP != "" {
-		return realIP, nil
-	}
-
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-
-	if err != nil {
-		return "", err
-	} else {
-		return ip, err
-	}
-}
-func runCurlFromCurlPod(podIP string) error {
-	cmd := exec.Command("kubectl", "exec", "-n", "curl-pod", "curlpod", "--",
-		"curl", fmt.Sprintf("http://%s:%s", podIP, containerPort),
-	)
-	_, err := cmd.CombinedOutput()
-
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+// It is the entrypoint of our external application.
+// It will work as a middleware which will forward the client request to the correct node/server.
+// it will find the correct node according to hash values and hit the kubernetes pod directly.
+// At the end it will broadcast the client registeration event to update the UI.
 func GetServer(w http.ResponseWriter, r *http.Request) {
+
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 	w.Header().Set("Content-Type", "application/json")
-	if clientIP, err := getIP(r); err == nil {
+
+	if clientIP, err := utility.GetIP(r); err == nil {
 		clientIP = fmt.Sprintf("%s-%d", clientIP, time.Now().UnixNano())
-		gotNode := hashring.GetRingInstance().GetNode(clientIP)
+		hashringInstance := hashring.GetRingInstance()
+		gotNode := hashringInstance.GetNode(clientIP)
 
-		if gotNode {
-			websocketserver.Broadcast(&pb.WebSocketMetadata{
-				Type: "client",
-				Data: &pb.WebSocketMetadata_RequestMetaData{
-					RequestMetaData: &pb.RequestMetaData{
-						AssignedNodeName: hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeName,
-						AssignedNodeIp:   hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP,
-						RequestHash:      hashring.GetRingInstance().RequestIpToMetaData[clientIP].RequestHash,
-						AssignedNodeHash: hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeHash,
-					},
-				},
+		assignedNodeIp := hashringInstance.RequestIpToMetaData[clientIP].AssignedNodeIP
+		requestHash := hashringInstance.RequestIpToMetaData[clientIP].RequestHash
+		assignedNodeName := hashringInstance.RequestIpToMetaData[clientIP].AssignedNodeName
+		assignedNodeHash := hashringInstance.RequestIpToMetaData[clientIP].AssignedNodeHash
+
+		// When there is no server/node available right now then we will send dummy data to the UI.
+		if !utility.IsNodeAvailable(assignedNodeIp, assignedNodeName, assignedNodeHash) {
+			assignedNodeHash = -1
+			assignedNodeIp = "0.0.0.0"
+			assignedNodeName = "NA"
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "No Server Available To Serve You. Please Try Again.",
 			})
-
-			err = runCurlFromCurlPod(hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP)
-			if err != nil {
-				log.Printf("Error running curl from curl-pod: %v", err)
-			} else {
-				log.Printf("Successfully ran curl to %s", hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP)
-			}
-
-			json.NewEncoder(w).Encode(map[string]string{"You Got Server With Ip": hashring.GetRingInstance().RequestIpToMetaData[clientIP].AssignedNodeIP})
+		} else if err := utility.RunCurlFromCurlPod(assignedNodeIp); err != nil {
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Internal Server Error. Can't Reach Server at IP: " + assignedNodeIp,
+			})
 		} else {
-			json.NewEncoder(w).Encode(map[string]string{"error": "No Server Available To Serve You.Please Try Again."})
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "You Got Server With IP: " + assignedNodeIp,
+			})
 		}
 
+		// If a client has come first time then only send the event to UI.
+		// because client will never be removed from UI , so no need to send same data again and again.
+		if gotNode {
+			utility.BroadcastRequestIPMetaData(requestHash, assignedNodeName, assignedNodeIp, assignedNodeHash)
+		}
 	} else {
-
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "We are not able to find the Ip address of request. Please try again.",
+		})
 	}
 }

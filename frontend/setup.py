@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
 
+# This is done for adding protopy package in pip list.
 setup(
     name="protopy",
     version="0.1",

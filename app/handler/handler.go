@@ -57,6 +57,8 @@ func GetServer(w http.ResponseWriter, r *http.Request) {
 
 	// Fallback to RemoteAddr
 	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip = fmt.Sprintf("%s-%d", ip, time.Now().UnixNano())
+	fmt.Println(ip, "ip")
 	trackIp(ip)
 	var wg sync.WaitGroup
 	chunk := int(loop) / worker

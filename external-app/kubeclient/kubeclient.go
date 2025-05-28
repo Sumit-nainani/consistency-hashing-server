@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"hashing/hashring"
-	websocketserver "hashing/websocket-server"
+	"hashing/utility"
 	"log"
 	"time"
-
-	pb "hashing/hashing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +14,13 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
+
+const (
+	addNode    = "add"
+	removeNode = "remove"
+)
+
+var hashringInstance *hashring.HashRing = hashring.GetRingInstance()
 
 func StartKubeClient() {
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
@@ -32,21 +37,20 @@ func StartKubeClient() {
 		log.Fatalf("Failed to create clientset: %v", err)
 	}
 
-	var resourceVersion string
-
+	
 	for {
-		// Get latest pod list and resourceVersion
+		// Getting latest pod list and resourceVersion.
 		podList, err := clientset.CoreV1().Pods("demo").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Printf("Error listing pods: %v", err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
-		resourceVersion = podList.ResourceVersion
 
 		watcher, err := clientset.CoreV1().Pods("demo").Watch(context.TODO(), metav1.ListOptions{
-			ResourceVersion: resourceVersion,
+			ResourceVersion: podList.ResourceVersion,
 		})
+		
 		if err != nil {
 			log.Printf("Failed to start watcher: %v", err)
 			time.Sleep(5 * time.Second)
@@ -55,56 +59,37 @@ func StartKubeClient() {
 
 		fmt.Println("🔁 Watching for pod events...")
 
+    // Go label used for breaking the watcher loop inside switch statement.
 	watchLoop:
 		for event := range watcher.ResultChan() {
 			switch obj := event.Object.(type) {
+			// if object type is k8s pod type then We will do upscaling/downscaling.
 			case *corev1.Pod:
 				pod := obj
-				resourceVersion = pod.ResourceVersion
-
+                
 				switch event.Type {
-				case watch.Added:
-					fmt.Printf("🟢 Pod Added: %s/%s\n", pod.Namespace, pod.Name)
-
+				// Pod downscaling event , We will broadcast the event only if pod exists.
 				case watch.Deleted:
 					fmt.Printf("🔴 Pod Deleted: %s/%s\n", pod.Namespace, pod.Name)
-					if nodeMeta, exists := hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name]; exists {
-						websocketserver.Broadcast(&pb.WebSocketMetadata{
-							Type:   "pod",
-							Action: "remove",
-							Data: &pb.WebSocketMetadata_NodeMetaData{
-								NodeMetaData: &pb.NodeMetaData{
-									NodeIp:   nodeMeta.NodeIP,
-									NodeName: pod.Name,
-									NodeHash: nodeMeta.NodeHash,
-								},
-							},
-						})
+					if nodeMeta, exists := hashringInstance.NodeNameToNodeMetaData[pod.Name]; exists {
+						utility.BroadcastNodeMetaData(removeNode, nodeMeta.NodeIP, nodeMeta.NodeName, nodeMeta.NodeHash)
 					}
-					hashring.GetRingInstance().RemoveNode(pod.Name)
+					hashringInstance.RemoveNode(pod.Name)
 
+                // Pod modified event , We will broadcast the creation event only if the pod is assigned IP address.
 				case watch.Modified:
 					fmt.Printf("✏️ Pod Modified: %s/%s %s\n", pod.Namespace, pod.Name, pod.Status.PodIP)
 					if pod.Status.Phase == corev1.PodRunning {
-
-						hashring.GetRingInstance().AddNode(pod.Name, pod.Status.PodIP)
-						websocketserver.Broadcast(&pb.WebSocketMetadata{
-							Type:   "pod",
-							Action: "add",
-							Data: &pb.WebSocketMetadata_NodeMetaData{
-								NodeMetaData: &pb.NodeMetaData{
-									NodeHash: hashring.GetRingInstance().NodeNameToNodeMetaData[pod.Name].NodeHash,
-									NodeIp:   pod.Status.PodIP,
-									NodeName: pod.Name,
-								},
-							},
-						})
-
+						hashringInstance.AddNode(pod.Name, pod.Status.PodIP)
+						nodeMeta := hashringInstance.NodeNameToNodeMetaData[pod.Name]
+						utility.BroadcastNodeMetaData(addNode, nodeMeta.NodeIP, nodeMeta.NodeName, nodeMeta.NodeHash)
 					}
+
 				default:
 					fmt.Println("Unknown pod event type")
 				}
 
+            // When object type is k8s status, not pod then we will restart the watcher.
 			case *metav1.Status:
 				log.Printf("📴 Watch closed with status: %s", obj.Message)
 				break watchLoop // exit the for loop cleanly

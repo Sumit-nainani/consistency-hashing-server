@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       app: go-app
-  replicas: 0
+  replicas: 5
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: go-app
-          image: nainani344sumit/goserver-for-consistencyhashing:v3
+          image: nainani344sumit/goserver-for-consistencyhashing:v4
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

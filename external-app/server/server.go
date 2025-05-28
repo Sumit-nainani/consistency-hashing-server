@@ -15,8 +15,14 @@ type NodeService struct {
 	pb.UnimplementedNodeServer
 }
 
+// This is RPC service which is registered in proto file.
+// It is used for fetching the initial data of availbale nodes and registered clients.
+// This service is called from frontend using a RPC python client and called first time when web interface is rendered.
+// This service passes a list of nodes and clients in the protobuff structure registered in proto file.
 func (ns *NodeService) GetHashRingData(ctx context.Context, req *pb.Empty) (*pb.WebSocketMetadataList, error) {
 	WebSocketMetadataList := &pb.WebSocketMetadataList{}
+
+	// Inserting node metadatas.
 	for _, node_meta_data := range hashring.GetRingInstance().NodeNameToNodeMetaData {
 		WebSocketMetadataList.Item = append(WebSocketMetadataList.Item, &pb.WebSocketMetadata{
 			Type:   "pod",
@@ -30,7 +36,8 @@ func (ns *NodeService) GetHashRingData(ctx context.Context, req *pb.Empty) (*pb.
 			},
 		})
 	}
-
+    
+	// Inserting client metadatas.
 	for _, request_meta_data := range hashring.GetRingInstance().RequestIpToMetaData {
 		WebSocketMetadataList.Item = append(WebSocketMetadataList.Item, &pb.WebSocketMetadata{
 			Type: "client",
@@ -48,8 +55,8 @@ func (ns *NodeService) GetHashRingData(ctx context.Context, req *pb.Empty) (*pb.
 	return WebSocketMetadataList, nil
 }
 
+// This method is starting gRPC server in a separate goroutine.
 func StartGrpcServer() {
-
 	hashRing := hashring.GetRingInstance()
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
@@ -59,29 +66,4 @@ func StartGrpcServer() {
 	pb.RegisterNodeServer(grpcServer, &NodeService{HashRing: hashRing})
 	log.Println("gRPC server on :50051")
 	grpcServer.Serve(lis)
-	// server := grpc.NewServer()
-	// nodeService := &NodeService{HashRing: hashRing}
-	// pb.RegisterNodeServer(server, nodeService)
-
-	// Wrap gRPC server with grpc-web
-	// wrappedGrpc := grpcweb.WrapServer(server,
-	// 	grpcweb.WithOriginFunc(func(origin string) bool { return true }), // Allow all origins
-	// )
-
-	// Create HTTP handler for grpc-web
-	// httpServer := http.Server{
-	// 	Addr: ":8080",
-	// 	Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-	// 		if wrappedGrpc.IsGrpcWebRequest(req) || wrappedGrpc.IsAcceptableGrpcCorsRequest(req) {
-	// 			wrappedGrpc.ServeHTTP(resp, req)
-	// 		} else {
-	// 			resp.WriteHeader(http.StatusNotFound)
-	// 		}
-	// 	}),
-	// }
-
-	// log.Println("gRPC-Web Server listening on :8080")
-	// if err := httpServer.ListenAndServe(); err != nil {
-	// 	log.Fatalf("Failed to serve HTTP: %v", err)
-	// }
 }

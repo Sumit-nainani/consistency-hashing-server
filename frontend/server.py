@@ -1,22 +1,16 @@
-import sys
-sys.path.append("/Users/sumitnainani/Desktop/goserver/frontend")
-import asyncio
+import asyncio,os
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
-from tornado import escape
 import websockets
-import json
-from google.protobuf.json_format import MessageToDict
-from google.protobuf.json_format import MessageToJson
-# from grpc.grpcClient import fetch_data_from_grpc
 from protopy import hashing_pb2
+from dotenv import load_dotenv
+from google.protobuf.json_format import MessageToJson
 from grpcClient.grpcClient import fetch_data_from_grpc
 
+load_dotenv()
 clients = set()
 
-
-    
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("static/index.html")
@@ -24,29 +18,22 @@ class MainHandler(tornado.web.RequestHandler):
 class WebClientSocket(tornado.websocket.WebSocketHandler):
     def open(self):
         clients.add(self)
-        initial_data = fetch_data_from_grpc()
-        json_data = MessageToJson(initial_data)
-        print(json_data,"json_data")
-        self.write_message(json_data)
+        self.write_message(MessageToJson(fetch_data_from_grpc()))
         print("Frontend connected")
 
     def on_close(self):
         clients.remove(self)
         print("Frontend disconnected")
 
+# Websocket client for Golang Websocket server.
 async def consume_from_go_ws():
-    uri = "ws://localhost:8085/ws"
-    async for ws in websockets.connect(uri):
+    async for ws in websockets.connect(os.getenv('WEBSOCKET_URL')):
         try:
             async for raw_data in ws:
                 proto_msg = hashing_pb2.WebSocketMetadata()
                 proto_msg.ParseFromString(raw_data)
-                json_data = MessageToDict(proto_msg)
-                print(json_data,"data")
-                # Send to connected frontend clients
                 for client in clients:
-                    print("sending data")
-                    client.write_message(json.dumps(json_data))
+                    client.write_message(MessageToJson(proto_msg))
         except Exception as e:
             print("WebSocket connection failed:", e)
             await asyncio.sleep(5)

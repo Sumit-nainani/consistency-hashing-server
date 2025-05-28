@@ -1,7 +1,6 @@
 package websocketserver
 
 import (
-	"fmt"
 	pb "hashing/hashing"
 	"log"
 	"net/http"
@@ -9,6 +8,11 @@ import (
 
 	"github.com/gorilla/websocket"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	once        sync.Once
+	hubInstance *Hub
 )
 
 var upgrader = websocket.Upgrader{
@@ -21,21 +25,25 @@ type Hub struct {
 	lock      sync.RWMutex
 }
 
-var hub = &Hub{
-	clients:   make(map[*websocket.Conn]bool),
-	broadcast: make(chan *pb.WebSocketMetadata, 100),
+// Singleton Pattern.
+func GetHubInstance() *Hub {
+	once.Do(func() {
+		hubInstance = &Hub{
+			clients:   make(map[*websocket.Conn]bool),
+			broadcast: make(chan *pb.WebSocketMetadata, 100),
+		}
+	})
+	return hubInstance
 }
 
-func GetHub() *Hub {
-	return hub
-}
-
+// Registering new Websocket client after reloading browser or network error.
 func (h *Hub) Register(conn *websocket.Conn) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.clients[conn] = true
 }
 
+// Unregistering old Websocket client.
 func (h *Hub) Unregister(conn *websocket.Conn) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -43,10 +51,12 @@ func (h *Hub) Unregister(conn *websocket.Conn) {
 	conn.Close()
 }
 
+// This method is used to listen from channel continuously when an event is inserted into broadcast channel.
+// Here We are sending serialized/marshalled data for efficiently using protobuff and reducing data size in the network.
+// We are broadcasting the data to all active websocket clients.
 func (h *Hub) Run() {
-	for msg := range h.broadcast {
-		fmt.Println(msg, "message")
-		serialized, err := proto.Marshal(msg)
+	for messageEvent := range h.broadcast {
+		serializedEvent, err := proto.Marshal(messageEvent)
 		if err != nil {
 			log.Println("Failed to serialize:", err)
 			continue
@@ -54,7 +64,7 @@ func (h *Hub) Run() {
 
 		h.lock.RLock()
 		for client := range h.clients {
-			if err := client.WriteMessage(websocket.BinaryMessage, serialized); err != nil {
+			if err := client.WriteMessage(websocket.BinaryMessage, serializedEvent); err != nil {
 				log.Println("Write error:", err)
 				h.lock.RUnlock()
 				h.Unregister(client)
@@ -65,8 +75,8 @@ func (h *Hub) Run() {
 	}
 }
 
-func Broadcast(msg *pb.WebSocketMetadata) {
-	GetHub().broadcast <- msg
+func Broadcast(messageEvent *pb.WebSocketMetadata) {
+	GetHubInstance().broadcast <- messageEvent
 }
 
 func HandleWS(w http.ResponseWriter, r *http.Request) {
@@ -75,59 +85,15 @@ func HandleWS(w http.ResponseWriter, r *http.Request) {
 		log.Println("Upgrade error:", err)
 		return
 	}
-	// defer conn.Close()
 
 	log.Println("WebSocket client connected")
 
-	// hashinstance := hashring.GetRingInstance()
+	GetHubInstance().Register(conn)
 
-	// // Listen for new pods
-	// go func() {
-	// 	for podData := range kubeclient.Ch {
-	// 		pod := Pod{
-	// 			Podip:   podData.Podip,
-	// 			PodName: podData.Podname,
-	// 			Podhash: hashinstance.GetNodeHashValue(podData.Podip),
-	// 		}
-
-	// 		podMsg := Message{
-	// 			Type: "pod",
-	// 			Data: pod,
-	// 		}
-
-	// 		if err := conn.WriteJSON(podMsg); err != nil {
-	// 			log.Println("Error sending pod message:", err)
-	// 			continue
-	// 		} else {
-	// 			fmt.Println("data sent")
-	// 		}
-	// 	}
-	// }()
-
-	// // Listen for new client IPs
-	// go func() {
-	// 	for ip := range handler.Ch {
-	// 		clientIP := ClientIP{
-	// 			ClientIP: ip,
-	// 			IPhash:   hashinstance.IPToKey[ip],
-	// 		}
-
-	// 		clientMsg := Message{
-	// 			Type: "client",
-	// 			Data: clientIP,
-	// 		}
-
-	// 		if err := conn.WriteJSON(clientMsg); err != nil {
-	// 			log.Println("Error sending client IP message:", err)
-	// 			continue
-	// 		}
-	// 	}
-	// }()
-	// // Keep the connection open
-	// select {}
-	GetHub().Register(conn)
+	// Here this method is used to unregister the dead websocket client.
+	// If It is not getting anything from client side then the websocket client is dead , so just unregister it.
 	go func() {
-		defer GetHub().Unregister(conn)
+		defer GetHubInstance().Unregister(conn)
 		for {
 			if _, _, err := conn.NextReader(); err != nil {
 				break

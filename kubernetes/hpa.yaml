@@ -22,7 +22,7 @@ spec:
       target:
         # target 3 requests per second,
         type: AverageValue
-        averageValue: 500000m
+        averageValue: 500m
   - type: Resource
     resource:
       name: cpu
