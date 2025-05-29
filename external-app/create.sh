@@ -1,3 +1,6 @@
+# To run this script give cluster name and config file available in this directory.
+# sh create.sh <cluster-name> config.yaml
+
 #!/bin/bash
 
 # Enable exit on error
@@ -67,3 +70,19 @@ echo "✅ Curl pod created in 'curl-pod' namespace."
 
 # Final confirmation
 echo "✅ Cluster '$CLUSTER_NAME' setup complete with namespaces, Prometheus, and Metrics Server."
+
+# creating pyhton virtual environment and installing all required dependency for running app.
+cd ../frontend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+#!/bin/bash
+
+cat > .env <<EOL
+WEBSOCKET_URL='ws://localhost:8085/ws'
+GRPC_SERVER_URL = 'localhost:50051'
+EOL
+
+echo ".env file created with WEBSOCKET_URL and GRPC_SERVER_URL"
+
+
