@@ -50,7 +50,7 @@ This project demonstrates a real-time dashboard and backend system for consisten
 
 ## 🧠 Architecture
 
-![Architecture](path/to/your/architecture-image.png)
+![Architecture](https://github.com/user-attachments/assets/d649e515-89d9-485d-9eca-a09169ffc589)
 
 ---
 
@@ -139,12 +139,6 @@ To observe scaling behavior
 ## 🤝 Contributing
 
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
-
----
-
-## 📄 License
-
-[MIT](LICENSE)
 
 ---
 
