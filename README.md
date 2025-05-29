@@ -59,7 +59,7 @@ This project demonstrates a real-time dashboard and backend system for consisten
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/consistency-hashing.git
+git clone https://github.com/Sumit-nainani/consistency-hashing-server.git
 cd consistency-hashing
 ```
 
