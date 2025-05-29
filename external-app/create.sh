@@ -56,8 +56,14 @@ kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/late
 # Check if metrics-server is installed successfully
 echo "✅ Metrics server installed successfully."
 
-kubectl run curl --image=curlimages/curl --namespace=curl-pod --restart=Never -- sleep 3600
-echo "✅ Curl pod created in 'curl' namespace."
+kubectl patch deployment metrics-server -n kube-system --type='json' -p='[
+  {"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-insecure-tls"},
+  {"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--kubelet-preferred-address-types=InternalIP"}
+]'
+echo "✅ Patched metrics-server deployment with insecure TLS and preferred address types."
+
+kubectl run curlpod --image=curlimages/curl --namespace=curl-pod --restart=Never -- sleep infinity
+echo "✅ Curl pod created in 'curl-pod' namespace."
 
 # Final confirmation
 echo "✅ Cluster '$CLUSTER_NAME' setup complete with namespaces, Prometheus, and Metrics Server."

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"fmt"
+	"encoding/json"
 	metrics "goserver/metric"
 	"net"
 	"net/http"
@@ -26,8 +26,8 @@ func trackIp(ip string) {
 	ipSeen[ip] = time.Now()
 }
 
+// This method will watch last 1 minute IP burst , If it is greater then threshold (custom metric) then upscaling will be done.
 func PruneOldIps() {
-
 	for {
 		time.Sleep(10 * time.Second)
 		mu.Lock()
@@ -45,21 +45,21 @@ func PruneOldIps() {
 func GetServer(w http.ResponseWriter, r *http.Request) {
 
 	runtime.GOMAXPROCS(4)
+	startTime := time.Now()
 	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		fmt.Println(forwarded, "forwarded")
-	}
-
 	realIP := r.Header.Get("X-Real-IP")
-	if realIP != "" {
-		fmt.Println(realIP, "real")
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+	var clientIP string
+	if len(forwarded) != 0 {
+		clientIP = forwarded
+	} else if len(realIP) != 0 {
+		clientIP = realIP
+	} else {
+		clientIP = ip
 	}
 
-	// Fallback to RemoteAddr
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	ip = fmt.Sprintf("%s-%d", ip, time.Now().UnixNano())
-	fmt.Println(ip, "ip")
-	trackIp(ip)
+	trackIp(clientIP)
 	var wg sync.WaitGroup
 	chunk := int(loop) / worker
 
@@ -77,13 +77,11 @@ func GetServer(w http.ResponseWriter, r *http.Request) {
 			for j := start; j < end; j++ {
 				sum += j % 10
 			}
-			fmt.Println("Thread : ", i)
-
 		}(start, end)
 	}
 
 	wg.Wait()
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("<h1>Hello</h1>"))
+	json.NewEncoder(w).Encode(map[string]string{"message": "request served", "duration": time.Since(startTime).String(), "clientIP": clientIP})
 }
