@@ -62,16 +62,16 @@ func (h *Hub) Run() {
 			continue
 		}
 
-		h.lock.RLock()
+		h.lock.Lock()
 		for client := range h.clients {
 			if err := client.WriteMessage(websocket.BinaryMessage, serializedEvent); err != nil {
 				log.Println("Write error:", err)
-				h.lock.RUnlock()
+				h.lock.Unlock()
 				h.Unregister(client)
-				h.lock.RLock()
+				h.lock.Lock()
 			}
 		}
-		h.lock.RUnlock()
+		h.lock.Unlock()
 	}
 }
 

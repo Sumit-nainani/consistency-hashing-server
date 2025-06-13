@@ -9,7 +9,7 @@ import (
 
 // consistency hash ring size adjusted according to screen.
 const (
-	RING_SIZE = 100
+	RING_SIZE = 150
 )
 
 var (
@@ -203,8 +203,8 @@ func (hr *HashRing) RemoveNode(nodeNameOfRemovableNode string) {
 // We are calculation ip hashes using crc32 checksum and finding lower bound
 // for that request ip hash value.
 func (hr *HashRing) GetNode(requestIP string) bool {
-	hr.RLock()
-	defer hr.RUnlock()
+	hr.Lock()
+	defer hr.Unlock()
 
 	// If a node is assigned to a request first time then for next requests we dont need to compute again.
 	if _, isAlreadyAssignedNode := hr.RequestIpToMetaData[requestIP]; isAlreadyAssignedNode {

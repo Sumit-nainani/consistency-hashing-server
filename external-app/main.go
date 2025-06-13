@@ -5,6 +5,7 @@ import (
 	"hashing/kubeclient"
 	"hashing/router"
 	"hashing/server"
+	"hashing/utility"
 	websocketserver "hashing/websocket-server"
 	"log"
 	"net/http"
@@ -15,25 +16,29 @@ import (
 
 func main() {
 	// Starting grpc server.
-	go server.StartGrpcServer()
+	utility.SafeGo("grpc-server", server.StartGrpcServer)
 	// Starting kubernetes watcher.
-	go kubeclient.StartKubeClient()
+	utility.SafeGo("kube-client", kubeclient.StartKubeClient)
 	// Starting Websocket event consuming method.
 	go websocketserver.GetHubInstance().Run()
+	utility.SafeGo("websocket-hub", websocketserver.GetHubInstance().Run)
 
 	// Setting up HTTP server
 	// Running HTTP server with graceful termination of 5 second buffer.
 	srv := &http.Server{
-		Addr:    ":8085",
-		Handler: router.Router(),
+		Addr:         ":8085",
+		Handler:      router.Router(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	go func() {
+	utility.SafeGo("http-server", func() {
 		log.Println("HTTP server started on :8085")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("http server error: %v", err)
+			log.Printf("HTTP server error: %v", err)
 		}
-	}()
+	})
 
 	// Listening for OS signals (ctrl + c).
 	stop := make(chan os.Signal, 1)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	pb "hashing/hashing"
 	websocketserver "hashing/websocket-server"
+	"log"
 	"net"
 	"net/http"
 	"os/exec"
@@ -72,12 +73,25 @@ func GetIP(r *http.Request) (string, error) {
 // We are hitting directly the kubernets pod for our usecase , but it is not the production idea.
 func RunCurlFromCurlPod(podIP string) error {
 	cmd := exec.Command("kubectl", "exec", "-n", "curl-pod", "curlpod", "--",
-		"curl", fmt.Sprintf("http://%s:%s", podIP, containerPort),
+		"curl", "--max-time", "3", fmt.Sprintf("http://%s:%s", podIP, containerPort),
 	)
 	if _, err := cmd.CombinedOutput(); err != nil {
 		return err
 	}
 	return nil
+}
+
+// Utility method for recovery from panic , safe method.
+func SafeGo(name string, fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Panic in goroutine [%s]: %v", name, r)
+			}
+		}()
+		log.Printf("Starting goroutine: %s", name)
+		fn()
+	}()
 }
 
 // Utility function for finding whether there is at least one node available or not.

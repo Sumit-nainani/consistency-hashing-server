@@ -80,7 +80,7 @@ pip install -r requirements.txt
 
 cat > .env <<EOL
 WEBSOCKET_URL='ws://localhost:8085/ws'
-GRPC_SERVER_URL = 'localhost:50051'
+GRPC_SERVER_URL='localhost:50051'
 EOL
 
 echo ".env file created with WEBSOCKET_URL and GRPC_SERVER_URL"

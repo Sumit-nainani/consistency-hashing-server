@@ -1,4 +1,4 @@
-const ringSize = 100;
+const ringSize = 150;
 const radius = 1.4;
 const angles = Array.from(
   { length: ringSize },
@@ -19,8 +19,8 @@ function drawRing(pods = [], clients = [], podItems = [], clientItems = []) {
   const layout = {
     xaxis: { visible: false },
     yaxis: { visible: false, scaleanchor: "x", scaleratio: 1 },
-    width: 1000,
-    height: 1000,
+    width: 1500,
+    height: 1500,
     margin: { l: 10, r: 10, t: 10, b: 10 },
     plot_bgcolor: "#fafafa",
     images: [],
@@ -39,7 +39,7 @@ function drawRing(pods = [], clients = [], podItems = [], clientItems = []) {
     x: angles.map((a) => radius * Math.cos(a)),
     y: angles.map((a) => radius * Math.sin(a)),
     mode: "markers+text",
-    marker: { size: 22, color: "#daeff0" },
+    marker: { size: 22, color: "#daeff0" }, 
     text: Array.from({ length: ringSize }, (_, i) => String(i)),
     textfont: { size: 10, color: "black" },
     textposition: "middle center",
